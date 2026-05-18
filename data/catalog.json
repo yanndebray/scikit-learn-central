@@ -23,10 +23,11 @@
       "pipelines",
       "model-selection"
     ],
-    "provides_estimators": true,
-    "consumes_estimators": true,
     "contributors_count": 3000,
-    "archived": false
+    "archived": false,
+    "categories": [
+      "components"
+    ]
   },
   "packages": [
     "skrub",
@@ -50,7 +51,6 @@
     "scikit-survival",
     "umap-learn",
     "prince",
-    "eli5",
     "mlxtend",
     "mlflow",
     "scikit-lego",
@@ -66,5 +66,11 @@
     "bertopic",
     "lightshap",
     "model-diagnostics"
+  ],
+  "featured_packages": [
+    "skore",
+    "skrub",
+    "skops",
+    "tabicl"
   ]
 }

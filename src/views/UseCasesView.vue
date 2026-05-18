@@ -1,17 +1,29 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import CatalogListShell from '@/components/CatalogListShell.vue'
+import FilterBottomSheet from '@/components/FilterBottomSheet.vue'
 import FilterDropdown from '@/components/FilterDropdown.vue'
 import UseCaseCard from '@/components/UseCaseCard.vue'
+import UseCaseListColumnHeader from '@/components/UseCaseListColumnHeader.vue'
+import UseCaseListRow from '@/components/UseCaseListRow.vue'
+import { useUseCaseCatalogGroups, type UseCaseGroupByKey } from '@/composables/useUseCaseCatalogGroups'
+import { useUseCaseDescriptionExpand } from '@/composables/useUseCaseDescriptionExpand'
+import { useUseCasePackagesPanelHeights } from '@/composables/useUseCasePackagesPanelHeights'
+import { useUseCasePackagesExpand } from '@/composables/useUseCasePackagesExpand'
 import { useUseCases } from '@/composables/useUseCases'
 import type { Difficulty, UseCase } from '@/types/usecase'
+import {
+  APPLICATION_FIELDS,
+  DATA_TYPES,
+  PROBLEM_TYPES,
+  difficultyRank,
+  humanizeTaxonomyValue,
+} from '@/types/usecase-taxonomy'
 
 const route = useRoute()
+const router = useRouter()
 const { useCases } = useUseCases()
-
-/** Longest card-enter delay in .uc-grid (see components.css). */
-const CARD_ENTER_MS = 320
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Slug with ?slug= deep link: permanent border + expanded synopsis. */
 const focusedSlug = ref<string | null>(null)
@@ -19,121 +31,132 @@ const focusedSlug = ref<string | null>(null)
 const pulsingSlug = ref<string | null>(null)
 
 const search = ref('')
-const industrySel = ref<Set<string>>(new Set())
-const techniqueSel = ref<Set<string>>(new Set())
+const applicationFieldSel = ref<Set<string>>(new Set())
+const problemTypeSel = ref<Set<string>>(new Set())
+const dataTypeSel = ref<Set<string>>(new Set())
 const difficultySel = ref<Set<Difficulty>>(new Set())
+type CatalogLayout = 'cards' | 'list'
 
-const INDUSTRIES = [
-  'banking',
-  'insurance',
-  'healthcare',
-  'retail',
-  'e-commerce',
-  'manufacturing',
-  'telecom',
-  'energy',
-  'logistics',
-  'hr',
-  'marketing',
-  'real-estate',
-  'cybersecurity',
-  'agriculture',
-] as const
+const groupBy = ref<UseCaseGroupByKey>('none')
+const sortByDifficulty = ref(false)
+const catalogLayout = ref<CatalogLayout>('cards')
 
-const TECHNIQUES = [
-  'fraud-detection',
-  'churn-prediction',
-  'credit-scoring',
-  'predictive-maintenance',
-  'recommendation',
-  'demand-forecasting',
-  'anomaly-detection',
-  'customer-segmentation',
-  'sentiment-analysis',
-  'survival-analysis',
-  'time-series',
-  'classification',
-  'regression',
-  'clustering',
-  'nlp',
-  'explainability',
-  'price-optimization',
-] as const
+const { setUseCaseDescriptionsExpanded } = useUseCaseDescriptionExpand()
+
+/* Package filter — set by the "Used in N use cases" pill on a PackageCard,
+   which links here with ?package=<id>. We mirror the URL into state so
+   back/forward + sharing both work. */
+const packageFilter = ref<string>(
+  typeof route.query.package === 'string' ? route.query.package : '',
+)
+
+/** Longest card-enter delay in .uc-grid (see components.css). */
+const CARD_ENTER_MS = 320
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function clearPackageFilter(): void {
+  packageFilter.value = ''
+  /* Drop the query string from the URL so a refresh doesn't bring it back. */
+  const { package: _drop, ...rest } = route.query
+  router.replace({ path: route.path, query: rest })
+}
 
 const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const satisfies
   readonly Difficulty[]
-
-const INDUSTRY_LABELS: Record<string, string> = {
-  hr: 'HR / People',
-  'e-commerce': 'E-Commerce',
-  'real-estate': 'Real Estate',
-}
-
-function humanize(s: string): string {
-  return INDUSTRY_LABELS[s] ?? s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')
-}
 
 function countUcBy(predicate: (uc: UseCase) => boolean): number {
   return useCases.value.filter(predicate).length
 }
 
-const industryOptions = computed(() =>
-  INDUSTRIES.map((v) => ({
-    value: v,
-    label: humanize(v),
-    count: countUcBy((uc) => uc.industry.includes(v)),
-  })),
+function taxonomyOptions(
+  allowlist: readonly string[],
+  hasValue: (uc: UseCase, slug: string) => boolean,
+) {
+  return allowlist
+    .map((v) => ({
+      value: v,
+      label: humanizeTaxonomyValue(v),
+      count: countUcBy((uc) => hasValue(uc, v)),
+    }))
+    .filter((o) => o.count > 0)
+}
+
+const applicationFieldOptions = computed(() =>
+  taxonomyOptions(APPLICATION_FIELDS, (uc, v) => uc.application_fields.includes(v)),
 )
-const techniqueOptions = computed(() =>
-  TECHNIQUES.map((v) => ({
-    value: v,
-    label: humanize(v),
-    count: countUcBy((uc) => uc.technique.includes(v)),
-  })),
+const problemTypeOptions = computed(() =>
+  taxonomyOptions(PROBLEM_TYPES, (uc, v) => uc.problem_types.includes(v)),
+)
+const dataTypeOptions = computed(() =>
+  taxonomyOptions(DATA_TYPES, (uc, v) => uc.data_types.includes(v)),
 )
 const difficultyOptions = computed(() =>
   DIFFICULTIES.map((v) => ({
     value: v,
-    label: humanize(v),
+    label: humanizeTaxonomyValue(v),
     count: countUcBy((uc) => uc.difficulty === v),
-  })),
+  })).filter((o) => o.count > 0),
 )
 
 const filtered = computed(() => {
   let r = [...useCases.value]
+  if (packageFilter.value)
+    r = r.filter((uc) => uc.packages.includes(packageFilter.value))
   const q = search.value.trim().toLowerCase()
   if (q) {
     r = r.filter(
       (uc) =>
         uc.title.toLowerCase().includes(q) ||
         uc.synopsis.toLowerCase().includes(q) ||
-        uc.industry.some((i) => i.includes(q)) ||
-        uc.technique.some((t) => t.includes(q)) ||
+        uc.application_fields.some((i) => i.includes(q)) ||
+        uc.problem_types.some((t) => t.includes(q)) ||
+        uc.data_types.some((d) => d.includes(q)) ||
         uc.packages.some((p) => p.includes(q)),
     )
   }
-  if (industrySel.value.size)
-    r = r.filter((uc) => uc.industry.some((i) => industrySel.value.has(i)))
-  if (techniqueSel.value.size)
-    r = r.filter((uc) => uc.technique.some((t) => techniqueSel.value.has(t)))
+  if (applicationFieldSel.value.size)
+    r = r.filter((uc) =>
+      uc.application_fields.some((i) => applicationFieldSel.value.has(i)),
+    )
+  if (problemTypeSel.value.size)
+    r = r.filter((uc) => uc.problem_types.some((t) => problemTypeSel.value.has(t)))
+  if (dataTypeSel.value.size)
+    r = r.filter((uc) => uc.data_types.some((d) => dataTypeSel.value.has(d)))
   if (difficultySel.value.size)
     r = r.filter((uc) => difficultySel.value.has(uc.difficulty))
   return r
 })
 
+function sortUseCases(list: UseCase[]): UseCase[] {
+  if (!sortByDifficulty.value) return list
+  return [...list].sort((a, b) => {
+    const d = difficultyRank(a.difficulty) - difficultyRank(b.difficulty)
+    return d !== 0 ? d : a.title.localeCompare(b.title)
+  })
+}
+
+const sortedFiltered = computed(() => sortUseCases(filtered.value))
+
+const { groupedSections } = useUseCaseCatalogGroups(sortedFiltered, groupBy)
+
 const hasAnyFilter = computed(
   () =>
     !!search.value ||
-    industrySel.value.size > 0 ||
-    techniqueSel.value.size > 0 ||
+    !!packageFilter.value ||
+    applicationFieldSel.value.size > 0 ||
+    problemTypeSel.value.size > 0 ||
+    dataTypeSel.value.size > 0 ||
     difficultySel.value.size > 0,
 )
 
 function resetFilters(): void {
   search.value = ''
-  industrySel.value = new Set()
-  techniqueSel.value = new Set()
+  applicationFieldSel.value = new Set()
+  problemTypeSel.value = new Set()
+  dataTypeSel.value = new Set()
   difficultySel.value = new Set()
+  clearPackageFilter()
+  setUseCaseDescriptionsExpanded(false)
 }
 
 interface ActiveChip {
@@ -144,6 +167,13 @@ interface ActiveChip {
 
 const activeChips = computed<ActiveChip[]>(() => {
   const chips: ActiveChip[] = []
+  if (packageFilter.value) {
+    chips.push({
+      key: `package:${packageFilter.value}`,
+      label: `uses ${packageFilter.value}`,
+      remove: clearPackageFilter,
+    })
+  }
   if (search.value) {
     chips.push({
       key: 'search',
@@ -154,11 +184,12 @@ const activeChips = computed<ActiveChip[]>(() => {
   const addAll = <T extends string>(
     prefix: string,
     set: { value: Set<T> },
+    labelFor: (v: T) => string = (v) => v,
   ): void => {
     for (const v of set.value) {
       chips.push({
         key: `${prefix}:${v}`,
-        label: v,
+        label: labelFor(v),
         remove: () => {
           const next = new Set(set.value)
           next.delete(v)
@@ -167,9 +198,10 @@ const activeChips = computed<ActiveChip[]>(() => {
       })
     }
   }
-  addAll('industry', industrySel)
-  addAll('technique', techniqueSel)
-  addAll('difficulty', difficultySel)
+  addAll('application-field', applicationFieldSel, humanizeTaxonomyValue)
+  addAll('problem-type', problemTypeSel, humanizeTaxonomyValue)
+  addAll('data-type', dataTypeSel, humanizeTaxonomyValue)
+  addAll('difficulty', difficultySel, humanizeTaxonomyValue)
   return chips
 })
 
@@ -206,7 +238,7 @@ async function focusUseCaseFromSlug(slug: string): Promise<void> {
   if (!isSlugVisible(slug)) resetFilters()
 
   await nextTick()
-  // card-enter animation on .uc-grid > .uc-card overrides uc-highlight until it ends
+  // card-enter animation on .uc-grid > .card overrides focus pulse until it ends
   await new Promise<void>((resolve) => setTimeout(resolve, CARD_ENTER_MS))
 
   const el = document.querySelector<HTMLElement>(`[data-uc-id="${CSS.escape(slug)}"]`)
@@ -230,16 +262,35 @@ function focusFromRouteQuery(): void {
   void focusUseCaseFromSlug(slug)
 }
 
-watch(() => route.query.slug, focusFromRouteQuery)
 onMounted(focusFromRouteQuery)
+watch(() => route.query.slug, focusFromRouteQuery)
+watch(
+  () => route.query.package,
+  (v) => (packageFilter.value = typeof v === 'string' ? v : ''),
+)
+
+const filtersSheetOpen = ref(false)
+
+const viewUseCasesEl = ref<HTMLElement | null>(null)
+const { useCasePackagesExpanded } = useUseCasePackagesExpand()
+const { syncExpandedPanelHeights } = useUseCasePackagesPanelHeights(viewUseCasesEl)
+
+watch(
+  () => filtered.value.length,
+  () => void nextTick(syncExpandedPanelHeights),
+)
+
+watch(useCasePackagesExpanded, () => {
+  void nextTick(syncExpandedPanelHeights)
+})
 
 </script>
 
 <template>
   <div class="filter-bar">
-    <div class="filter-bar__inner">
-      <div class="filter-bar__search">
-        <i class="fas fa-search filter-bar__search-icon"></i>
+    <div class="filter-bar-inner">
+      <div class="filter-bar-search">
+        <i class="fas fa-search filter-bar-search-icon"></i>
         <input
           v-model="search"
           type="search"
@@ -250,16 +301,32 @@ onMounted(focusFromRouteQuery)
         />
       </div>
 
-      <div class="filter-bar__groups">
+      <button
+        type="button"
+        class="filter-bar-open-filters"
+        aria-haspopup="dialog"
+        :aria-expanded="filtersSheetOpen"
+        @click="filtersSheetOpen = true"
+      >
+        <i class="fas fa-sliders-h" aria-hidden="true"></i>
+        Filters
+      </button>
+
+      <div class="filter-bar-groups filter-bar-groups--desktop">
         <FilterDropdown
-          v-model="industrySel"
-          label="Industry"
-          :options="industryOptions"
+          v-model="applicationFieldSel"
+          label="Application Field"
+          :options="applicationFieldOptions"
         />
         <FilterDropdown
-          v-model="techniqueSel"
-          label="Technique"
-          :options="techniqueOptions"
+          v-model="problemTypeSel"
+          label="Problem Type"
+          :options="problemTypeOptions"
+        />
+        <FilterDropdown
+          v-model="dataTypeSel"
+          label="Data Type"
+          :options="dataTypeOptions"
         />
         <FilterDropdown
           v-model="difficultySel"
@@ -268,9 +335,54 @@ onMounted(focusFromRouteQuery)
         />
       </div>
 
-      <div class="filter-bar__end">
+      <div class="filter-bar-end filter-bar-end--desktop">
+        <div
+          class="catalog-layout-toggle"
+          role="group"
+          aria-label="Use case display layout"
+        >
+          <button
+            type="button"
+            class="catalog-layout-toggle__btn"
+            :class="{ 'is-active': catalogLayout === 'cards' }"
+            :aria-pressed="catalogLayout === 'cards'"
+            title="Card layout"
+            @click="catalogLayout = 'cards'"
+          >
+            <i class="fas fa-th" aria-hidden="true"></i>
+            <span class="sr-only">Card layout</span>
+          </button>
+          <button
+            type="button"
+            class="catalog-layout-toggle__btn"
+            :class="{ 'is-active': catalogLayout === 'list' }"
+            :aria-pressed="catalogLayout === 'list'"
+            title="List layout"
+            @click="catalogLayout = 'list'"
+          >
+            <i class="fas fa-list" aria-hidden="true"></i>
+            <span class="sr-only">List layout</span>
+          </button>
+        </div>
         <button
-          class="filter-bar__clear"
+          type="button"
+          class="uc-sort-difficulty"
+          :class="{ 'is-active': sortByDifficulty }"
+          :aria-pressed="sortByDifficulty"
+          title="Sort by difficulty (beginner → advanced)"
+          @click="sortByDifficulty = !sortByDifficulty"
+        >
+          Sort: Difficulty
+        </button>
+        <select v-model="groupBy" class="sort-select--inline" title="Group by">
+          <option value="none">Group: None</option>
+          <option value="application-field">Group: Application Field</option>
+          <option value="problem-type">Group: Problem Type</option>
+          <option value="data-type">Group: Data Type</option>
+        </select>
+        <button
+          type="button"
+          class="filter-bar-clear"
           :class="{ 'is-visible': hasAnyFilter }"
           @click="resetFilters"
         >
@@ -287,12 +399,106 @@ onMounted(focusFromRouteQuery)
         @click="chip.remove"
       >
         {{ chip.label }}
-        <span class="active-filter-tag__remove">✕</span>
+        <span class="active-filter-tag-remove">✕</span>
       </span>
     </div>
+
+    <FilterBottomSheet v-model="filtersSheetOpen" title="Use case filters">
+      <div v-if="filtersSheetOpen" class="filter-sheet-stack">
+        <FilterDropdown
+          v-model="applicationFieldSel"
+          label="Application Field"
+          :options="applicationFieldOptions"
+        />
+        <FilterDropdown
+          v-model="problemTypeSel"
+          label="Problem Type"
+          :options="problemTypeOptions"
+        />
+        <FilterDropdown
+          v-model="dataTypeSel"
+          label="Data Type"
+          :options="dataTypeOptions"
+        />
+        <FilterDropdown
+          v-model="difficultySel"
+          label="Difficulty"
+          :options="difficultyOptions"
+        />
+        <div class="filter-sheet-display">
+          <span class="filter-sheet-display-label">Layout</span>
+          <div
+            class="catalog-layout-toggle"
+            role="group"
+            aria-label="Use case display layout"
+          >
+            <button
+              type="button"
+              class="catalog-layout-toggle__btn"
+              :class="{ 'is-active': catalogLayout === 'cards' }"
+              :aria-pressed="catalogLayout === 'cards'"
+              title="Card layout"
+              @click="catalogLayout = 'cards'"
+            >
+              <i class="fas fa-th" aria-hidden="true"></i>
+              <span class="sr-only">Card layout</span>
+            </button>
+            <button
+              type="button"
+              class="catalog-layout-toggle__btn"
+              :class="{ 'is-active': catalogLayout === 'list' }"
+              :aria-pressed="catalogLayout === 'list'"
+              title="List layout"
+              @click="catalogLayout = 'list'"
+            >
+              <i class="fas fa-list" aria-hidden="true"></i>
+              <span class="sr-only">List layout</span>
+            </button>
+          </div>
+          <span class="filter-sheet-display-label">Sort</span>
+          <button
+            type="button"
+            class="uc-sort-difficulty uc-sort-difficulty--sheet"
+            :class="{ 'is-active': sortByDifficulty }"
+            :aria-pressed="sortByDifficulty"
+            title="Sort by difficulty (beginner → advanced)"
+            @click="sortByDifficulty = !sortByDifficulty"
+          >
+            Sort: Difficulty
+          </button>
+          <label class="filter-sheet-display-label" for="uc-group-sheet">Group by</label>
+          <select id="uc-group-sheet" v-model="groupBy" class="sort-select--inline" title="Group by">
+            <option value="none">None</option>
+            <option value="application-field">Application Field</option>
+            <option value="problem-type">Problem Type</option>
+            <option value="data-type">Data Type</option>
+          </select>
+        </div>
+      </div>
+      <template #footer>
+        <button
+          type="button"
+          class="btn btn--outline btn--sm"
+          :disabled="!hasAnyFilter"
+          @click="resetFilters"
+        >
+          Clear all
+        </button>
+        <button type="button" class="btn btn--primary btn--sm" @click="filtersSheetOpen = false">
+          Done
+        </button>
+      </template>
+    </FilterBottomSheet>
   </div>
 
-  <div id="view-use-cases" class="view" role="tabpanel" aria-label="Use case explorer">
+  <div
+    id="view-use-cases"
+    ref="viewUseCasesEl"
+    class="view use-cases-page"
+    :class="{ 'use-cases-page--list': catalogLayout === 'list' }"
+    role="tabpanel"
+    aria-label="Use case explorer"
+  >
     <div class="page-content">
       <div class="uc-toolbar">
         <span class="uc-count" aria-live="polite">
@@ -301,22 +507,194 @@ onMounted(focusFromRouteQuery)
       </div>
 
       <div v-if="filtered.length === 0" class="state-empty">
-        <div class="state-empty__icon">🔬</div>
-        <div class="state-empty__title">No use cases found</div>
-        <p class="state-empty__subtitle">Try different filters or search terms.</p>
+        <div class="state-empty-icon">🔬</div>
+        <div class="state-empty-title">No use cases found</div>
+        <p class="state-empty-subtitle">Try different filters or search terms.</p>
         <button class="btn btn--outline" @click="resetFilters">Reset Filters</button>
       </div>
 
-      <div v-else class="uc-grid">
-        <UseCaseCard
-          v-for="uc in filtered"
-          :key="uc.uuid"
-          :use-case="uc"
-          :focused="focusedSlug === uc.slug"
-          :pulsing="pulsingSlug === uc.slug"
-          @pulse-end="clearPulse"
-        />
-      </div>
+      <template v-else>
+        <template v-if="groupBy === 'none'">
+          <div v-if="catalogLayout === 'cards'" class="uc-grid">
+            <UseCaseCard
+              v-for="uc in sortedFiltered"
+              :key="uc.uuid"
+              :use-case="uc"
+              :focused="focusedSlug === uc.slug"
+              :pulsing="pulsingSlug === uc.slug"
+              @pulse-end="clearPulse"
+            />
+          </div>
+          <CatalogListShell v-else variant="use-cases">
+            <UseCaseListColumnHeader />
+            <div class="catalog-list">
+              <UseCaseListRow
+                v-for="uc in sortedFiltered"
+                :key="uc.uuid"
+                :use-case="uc"
+                :focused="focusedSlug === uc.slug"
+                :pulsing="pulsingSlug === uc.slug"
+                @pulse-end="clearPulse"
+              />
+            </div>
+          </CatalogListShell>
+        </template>
+        <template v-else>
+          <section
+            v-for="(section, sectionIndex) in groupedSections"
+            :key="section.key"
+            class="uc-group"
+            :class="{ 'uc-group--first': sectionIndex === 0 }"
+            :aria-labelledby="`uc-group-${section.key}`"
+          >
+            <h3 :id="`uc-group-${section.key}`" class="uc-group-title">
+              {{ section.label }}
+              <span class="uc-group-count">{{ section.useCases.length }}</span>
+            </h3>
+            <div v-if="catalogLayout === 'cards'" class="uc-grid">
+              <UseCaseCard
+                v-for="uc in section.useCases"
+                :key="`${section.key}-${uc.uuid}`"
+                :use-case="uc"
+                :focused="focusedSlug === uc.slug"
+                :pulsing="pulsingSlug === uc.slug"
+                @pulse-end="clearPulse"
+              />
+            </div>
+            <CatalogListShell v-else variant="use-cases">
+              <UseCaseListColumnHeader />
+              <div class="catalog-list">
+                <UseCaseListRow
+                  v-for="uc in section.useCases"
+                  :key="`${section.key}-${uc.uuid}`"
+                  :use-case="uc"
+                  :focused="focusedSlug === uc.slug"
+                  :pulsing="pulsingSlug === uc.slug"
+                  @pulse-end="clearPulse"
+                />
+              </div>
+            </CatalogListShell>
+          </section>
+        </template>
+      </template>
     </div>
   </div>
 </template>
+
+<style scoped>
+.use-cases-page {
+  min-width: 0;
+}
+
+.uc-sort-difficulty {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  height: 34px;
+  padding: 0 12px;
+  border: 1.5px solid var(--neutral-300);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  color: var(--neutral-700);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--duration-sm) var(--ease),
+    color var(--duration-sm) var(--ease),
+    background var(--duration-sm) var(--ease);
+}
+
+.uc-sort-difficulty:hover,
+.uc-sort-difficulty:focus-visible {
+  border-color: var(--color-near-black);
+  outline: none;
+}
+
+.uc-sort-difficulty.is-active {
+  border-color: var(--color-orange);
+  color: var(--color-orange);
+  background: var(--orange-050);
+}
+
+.uc-sort-difficulty--sheet {
+  width: 100%;
+  max-width: 100%;
+}
+
+.uc-group {
+  margin-top: var(--space-8);
+}
+
+.uc-group--first {
+  margin-top: 0;
+}
+
+.uc-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+}
+
+.uc-group-count {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.catalog-layout-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  width: fit-content;
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.catalog-layout-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 36px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-sm) var(--ease),
+    color var(--duration-sm) var(--ease);
+}
+
+.catalog-layout-toggle__btn:last-child {
+  border-right: none;
+}
+
+.catalog-layout-toggle__btn:hover {
+  color: var(--text-primary);
+  background: var(--neutral-050);
+}
+
+.catalog-layout-toggle__btn.is-active {
+  background: var(--neutral-200);
+  color: var(--color-near-black);
+}
+
+.catalog-layout-toggle__btn:focus-visible {
+  outline: 2px solid var(--color-sky);
+  outline-offset: -2px;
+  z-index: 1;
+}
+</style>

@@ -1,47 +1,85 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import SklearnHero from '@/components/SklearnHero.vue'
 import PackageCard from '@/components/PackageCard.vue'
+import PackageListRow from '@/components/PackageListRow.vue'
+import PackageListColumnHeader from '@/components/PackageListColumnHeader.vue'
+import CatalogListShell from '@/components/CatalogListShell.vue'
+import FilterBottomSheet from '@/components/FilterBottomSheet.vue'
 import FilterDropdown from '@/components/FilterDropdown.vue'
+import { useCatalogDescriptionExpand } from '@/composables/useCatalogDescriptionExpand'
+import {
+  usePackageCatalogGroups,
+  type GroupByKey,
+} from '@/composables/usePackageCatalogGroups'
 import { usePackages } from '@/composables/usePackages'
 import { useUseCases } from '@/composables/useUseCases'
-import type { Nature, Scope, License } from '@/types/package'
+import type { Category, License } from '@/types/package'
+import { CATEGORIES, CATEGORY_META } from '@/types/package'
 
 type SortKey = 'ranking' | 'stars' | 'downloads' | 'name'
+type CatalogLayout = 'cards' | 'list'
 
-const { core, packages } = usePackages()
-const { useCases } = useUseCases()
+const route = useRoute()
+const { core, packages, featuredPackages } = usePackages()
+
+/** Deep-linked package card from ?package= (e.g. use-case package chips). */
+const focusedPackageId = ref<string | null>(null)
+const pulsingPackageId = ref<string | null>(null)
+
+const CARD_ENTER_MS = 320
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const { useCases, useCasesByPackage } = useUseCases()
+const { setCatalogDescriptionsExpanded } = useCatalogDescriptionExpand()
 
 const search = ref('')
-const natureSel = ref<Set<Nature>>(new Set())
-const scopeSel = ref<Set<Scope>>(new Set())
+const categorySel = ref<Set<Category>>(new Set())
 const licenseSel = ref<Set<License>>(new Set())
+const tagSel = ref<Set<string>>(new Set())
 const sortBy = ref<SortKey>('ranking')
+const groupBy = ref<GroupByKey>('main')
+const catalogLayout = ref<CatalogLayout>('cards')
 
-const NATURES = ['library', 'extension', 'application'] as const satisfies readonly Nature[]
-const SCOPES = ['core', 'incremental', 'verticalized'] as const satisfies readonly Scope[]
 const LICENSES = ['MIT', 'BSD-3-Clause', 'BSD-2-Clause', 'Apache-2.0', 'GPL-3.0'] as const
 
-function countBy<K extends keyof (typeof packages.value)[number]>(
-  key: K,
-  val: unknown,
-): number {
-  return packages.value.filter((p) => p[key] === val).length
+function countCategory(c: Category): number {
+  return packages.value.filter((p) => p.categories?.includes(c)).length
 }
 
-const natureOptions = computed(() =>
-  NATURES.map((v) => ({ value: v, label: cap(v), count: countBy('nature', v) })),
-)
-const scopeOptions = computed(() =>
-  SCOPES.map((v) => ({ value: v, label: cap(v), count: countBy('scope', v) })),
+function countLicense(l: string): number {
+  return packages.value.filter((p) => p.license === l).length
+}
+
+function countTag(tag: string): number {
+  return packages.value.filter((p) => (p.tags ?? []).includes(tag)).length
+}
+
+const categoryOptions = computed(() =>
+  CATEGORIES.map((c) => ({
+    value: c,
+    label: CATEGORY_META[c].label,
+    count: countCategory(c),
+    group: CATEGORY_META[c].tierLabel, // grouping header in the dropdown
+    tier: CATEGORY_META[c].tier,
+  })),
 )
 const licenseOptions = computed(() =>
-  LICENSES.map((v) => ({ value: v, label: v, count: countBy('license', v) })),
+  LICENSES.map((v) => ({ value: v, label: v, count: countLicense(v) })),
 )
-
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
+const tagOptions = computed(() => {
+  const seen = new Set<string>()
+  for (const p of packages.value) {
+    for (const t of p.tags ?? []) seen.add(t)
+  }
+  return [...seen]
+    .sort((a, b) => countTag(b) - countTag(a) || a.localeCompare(b))
+    .map((value) => ({
+      value,
+      label: value.replace(/-/g, ' '),
+      count: countTag(value),
+    }))
+})
 
 const useCaseCountByPkg = computed(() => {
   const map = new Map<string, number>()
@@ -63,32 +101,48 @@ const filtered = computed(() => {
         (p.pypi_name ?? '').toLowerCase().includes(q),
     )
   }
-  if (natureSel.value.size) r = r.filter((p) => natureSel.value.has(p.nature))
-  if (scopeSel.value.size) r = r.filter((p) => scopeSel.value.has(p.scope))
+  if (categorySel.value.size) {
+    r = r.filter((p) =>
+      (p.categories ?? []).some((c) => categorySel.value.has(c)),
+    )
+  }
   if (licenseSel.value.size) r = r.filter((p) => licenseSel.value.has(p.license))
+  if (tagSel.value.size) {
+    r = r.filter((p) => (p.tags ?? []).some((t) => tagSel.value.has(t)))
+  }
 
   r.sort((a, b) => {
     if (sortBy.value === 'name') return a.name.localeCompare(b.name)
     if (sortBy.value === 'stars') return (b.stars ?? 0) - (a.stars ?? 0)
     if (sortBy.value === 'downloads') return (b.downloads ?? 0) - (a.downloads ?? 0)
-    return (b.fitTotal ?? 0) - (a.fitTotal ?? 0)
+    return (b.fitBase ?? 0) - (a.fitBase ?? 0)
   })
   return r
 })
 
+const { groupedSections } = usePackageCatalogGroups(filtered, groupBy)
+
 const hasAnyFilter = computed(
   () =>
     !!search.value ||
-    natureSel.value.size > 0 ||
-    scopeSel.value.size > 0 ||
-    licenseSel.value.size > 0,
+    categorySel.value.size > 0 ||
+    licenseSel.value.size > 0 ||
+    tagSel.value.size > 0,
 )
+
+const featuredForDisplay = computed(() => {
+  const featured = featuredPackages.value
+  if (!hasAnyFilter.value) return featured
+  const allowed = new Set(filtered.value.map((p) => p.id))
+  return featured.filter((p) => allowed.has(p.id))
+})
 
 function resetFilters(): void {
   search.value = ''
-  natureSel.value = new Set()
-  scopeSel.value = new Set()
+  categorySel.value = new Set()
   licenseSel.value = new Set()
+  tagSel.value = new Set()
+  setCatalogDescriptionsExpanded(false)
 }
 
 interface ActiveChip {
@@ -109,11 +163,12 @@ const activeChips = computed<ActiveChip[]>(() => {
   const addAll = <T extends string>(
     prefix: string,
     set: { value: Set<T> },
+    labelFn: (v: T) => string = (v) => v,
   ): void => {
     for (const v of set.value) {
       chips.push({
         key: `${prefix}:${v}`,
-        label: v,
+        label: labelFn(v),
         remove: () => {
           const next = new Set(set.value)
           next.delete(v)
@@ -122,20 +177,97 @@ const activeChips = computed<ActiveChip[]>(() => {
       })
     }
   }
-  addAll('nature', natureSel)
-  addAll('scope', scopeSel)
+  addAll('category', categorySel)
   addAll('license', licenseSel)
+  addAll('tag', tagSel, (v) => v.replace(/-/g, ' '))
   return chips
 })
 
 const ucForCore = computed(() => useCaseCountByPkg.value.get('scikit-learn') ?? 0)
+
+const filtersSheetOpen = ref(false)
+
+function packageFromQuery(raw: unknown): string | null {
+  if (typeof raw === 'string' && raw) return raw
+  if (Array.isArray(raw) && typeof raw[0] === 'string' && raw[0]) return raw[0]
+  return null
+}
+
+function isKnownPackageId(id: string): boolean {
+  return id === core.value.id || packages.value.some((p) => p.id === id)
+}
+
+function isPackageVisible(id: string): boolean {
+  if (id === core.value.id) return true
+  return filtered.value.some((p) => p.id === id)
+}
+
+function clearPackagePulse(): void {
+  pulsingPackageId.value = null
+}
+
+function clearPackageFocus(): void {
+  focusedPackageId.value = null
+  clearPackagePulse()
+}
+
+function startPackagePulse(id: string): void {
+  pulsingPackageId.value = null
+  void nextTick(() => {
+    pulsingPackageId.value = id
+  })
+}
+
+async function focusPackageFromId(id: string): Promise<void> {
+  if (!isKnownPackageId(id)) return
+
+  if (!isPackageVisible(id)) resetFilters()
+
+  await nextTick()
+  await new Promise<void>((resolve) => setTimeout(resolve, CARD_ENTER_MS))
+
+  const selector =
+    id === core.value.id
+      ? `[data-catalog-id="${CSS.escape(id)}"]`
+      : `[data-id="${CSS.escape(id)}"]`
+  const el = document.querySelector<HTMLElement>(selector)
+  if (!el) return
+
+  el.scrollIntoView({
+    block: 'center',
+    behavior: prefersReducedMotion ? 'auto' : 'smooth',
+  })
+
+  focusedPackageId.value = id
+  startPackagePulse(id)
+}
+
+function focusFromRouteQuery(): void {
+  const id = packageFromQuery(route.query.package)
+  if (!id) {
+    clearPackageFocus()
+    return
+  }
+  void focusPackageFromId(id)
+}
+
+function isPackageFocused(id: string): boolean {
+  return focusedPackageId.value === id
+}
+
+function isPackagePulsing(id: string): boolean {
+  return pulsingPackageId.value === id
+}
+
+onMounted(focusFromRouteQuery)
+watch(() => route.query.package, focusFromRouteQuery)
 </script>
 
 <template>
   <div class="filter-bar">
-    <div class="filter-bar__inner">
-      <div class="filter-bar__search">
-        <i class="fas fa-search filter-bar__search-icon"></i>
+    <div class="filter-bar-inner">
+      <div class="filter-bar-search">
+        <i class="fas fa-search filter-bar-search-icon"></i>
         <input
           v-model="search"
           type="search"
@@ -146,21 +278,66 @@ const ucForCore = computed(() => useCaseCountByPkg.value.get('scikit-learn') ?? 
         />
       </div>
 
-      <div class="filter-bar__groups">
-        <FilterDropdown v-model="natureSel" label="Nature" :options="natureOptions" />
-        <FilterDropdown v-model="scopeSel" label="Scope" :options="scopeOptions" />
+      <button
+        type="button"
+        class="filter-bar-open-filters"
+        aria-haspopup="dialog"
+        :aria-expanded="filtersSheetOpen"
+        @click="filtersSheetOpen = true"
+      >
+        <i class="fas fa-sliders-h" aria-hidden="true"></i>
+        Filters
+      </button>
+
+      <div class="filter-bar-groups filter-bar-groups--desktop">
+        <FilterDropdown v-model="categorySel" label="Category" :options="categoryOptions" />
         <FilterDropdown v-model="licenseSel" label="License" :options="licenseOptions" />
+        <FilterDropdown v-model="tagSel" label="Tags" :options="tagOptions" />
       </div>
 
-      <div class="filter-bar__end">
+      <div class="filter-bar-end filter-bar-end--desktop">
+        <div
+          class="catalog-layout-toggle"
+          role="group"
+          aria-label="Package display layout"
+        >
+          <button
+            type="button"
+            class="catalog-layout-toggle__btn"
+            :class="{ 'is-active': catalogLayout === 'cards' }"
+            :aria-pressed="catalogLayout === 'cards'"
+            title="Card layout"
+            @click="catalogLayout = 'cards'"
+          >
+            <i class="fas fa-th" aria-hidden="true"></i>
+            <span class="sr-only">Card layout</span>
+          </button>
+          <button
+            type="button"
+            class="catalog-layout-toggle__btn"
+            :class="{ 'is-active': catalogLayout === 'list' }"
+            :aria-pressed="catalogLayout === 'list'"
+            title="List layout"
+            @click="catalogLayout = 'list'"
+          >
+            <i class="fas fa-list" aria-hidden="true"></i>
+            <span class="sr-only">List layout</span>
+          </button>
+        </div>
         <select v-model="sortBy" class="sort-select--inline" title="Sort by">
           <option value="ranking">Sort: Fit Score</option>
           <option value="stars">Sort: Stars</option>
           <option value="downloads">Sort: Monthly Downloads</option>
           <option value="name">Sort: Name A–Z</option>
         </select>
+        <select v-model="groupBy" class="sort-select--inline" title="Group by">
+          <option value="none">Group: None</option>
+          <option value="main">Group: Main category</option>
+          <option value="sub">Group: Subcategory</option>
+        </select>
         <button
-          class="filter-bar__clear"
+          type="button"
+          class="filter-bar-clear"
           :class="{ 'is-visible': hasAnyFilter }"
           @click="resetFilters"
         >
@@ -177,39 +354,426 @@ const ucForCore = computed(() => useCaseCountByPkg.value.get('scikit-learn') ?? 
         @click="chip.remove"
       >
         {{ chip.label }}
-        <span class="active-filter-tag__remove">✕</span>
+        <span class="active-filter-tag-remove">✕</span>
       </span>
     </div>
+
+    <FilterBottomSheet v-model="filtersSheetOpen" title="Package filters">
+      <div v-if="filtersSheetOpen" class="filter-sheet-stack">
+        <FilterDropdown v-model="categorySel" label="Category" :options="categoryOptions" />
+        <FilterDropdown v-model="licenseSel" label="License" :options="licenseOptions" />
+        <FilterDropdown v-model="tagSel" label="Tags" :options="tagOptions" />
+        <div class="filter-sheet-display">
+          <span class="filter-sheet-display-label">Layout</span>
+          <div
+            class="catalog-layout-toggle"
+            role="group"
+            aria-label="Package display layout"
+          >
+            <button
+              type="button"
+              class="catalog-layout-toggle__btn"
+              :class="{ 'is-active': catalogLayout === 'cards' }"
+              :aria-pressed="catalogLayout === 'cards'"
+              title="Card layout"
+              @click="catalogLayout = 'cards'"
+            >
+              <i class="fas fa-th" aria-hidden="true"></i>
+              <span class="sr-only">Card layout</span>
+            </button>
+            <button
+              type="button"
+              class="catalog-layout-toggle__btn"
+              :class="{ 'is-active': catalogLayout === 'list' }"
+              :aria-pressed="catalogLayout === 'list'"
+              title="List layout"
+              @click="catalogLayout = 'list'"
+            >
+              <i class="fas fa-list" aria-hidden="true"></i>
+              <span class="sr-only">List layout</span>
+            </button>
+          </div>
+          <label class="filter-sheet-display-label" for="pkg-sort-sheet">Sort</label>
+          <select id="pkg-sort-sheet" v-model="sortBy" class="sort-select--inline" title="Sort by">
+            <option value="ranking">Fit score</option>
+            <option value="stars">Stars</option>
+            <option value="downloads">Downloads</option>
+            <option value="name">Name A–Z</option>
+          </select>
+          <label class="filter-sheet-display-label" for="pkg-group-sheet">Group by</label>
+          <select
+            id="pkg-group-sheet"
+            v-model="groupBy"
+            class="sort-select--inline"
+            title="Group by"
+          >
+            <option value="none">None</option>
+            <option value="main">Main category</option>
+            <option value="sub">Subcategory</option>
+          </select>
+        </div>
+      </div>
+      <template #footer>
+        <button
+          type="button"
+          class="btn btn--outline btn--sm"
+          :disabled="!hasAnyFilter"
+          @click="resetFilters"
+        >
+          Clear all
+        </button>
+        <button type="button" class="btn btn--primary btn--sm" @click="filtersSheetOpen = false">
+          Done
+        </button>
+      </template>
+    </FilterBottomSheet>
   </div>
 
-  <div id="view-catalog" class="view" role="tabpanel" aria-label="Package catalog">
+  <div
+    id="view-catalog"
+    class="view catalog-page"
+    :class="{ 'catalog-page--list': catalogLayout === 'list' }"
+    role="tabpanel"
+    aria-label="Package catalog"
+  >
     <div class="page-content">
-      <SklearnHero :core="core" :use-case-count="ucForCore" />
+      <SklearnHero
+        :core="core"
+        :use-case-count="ucForCore"
+        :use-cases-filter-to="{ path: '/use-cases', query: { package: 'scikit-learn' } }"
+        :focused="isPackageFocused(core.id)"
+        :pulsing="isPackagePulsing(core.id)"
+        @pulse-end="clearPackagePulse"
+      />
+
+      <section
+        v-if="featuredForDisplay.length > 0"
+        class="catalog-featured"
+        aria-labelledby="catalog-featured-heading"
+      >
+        <div class="catalog-header catalog-header--featured">
+          <div class="catalog-header-main">
+            <h2 id="catalog-featured-heading" class="catalog-header-title">Featured Packages</h2>
+            <p class="catalog-featured-tagline">
+              Curated list of packages from our editorial team
+            </p>
+          </div>
+          <span class="catalog-header-count" aria-live="polite">
+            {{ featuredForDisplay.length }} package{{
+              featuredForDisplay.length !== 1 ? 's' : ''
+            }}
+          </span>
+        </div>
+        <div v-if="catalogLayout === 'cards'" class="catalog-grid">
+          <PackageCard
+            v-for="pkg in featuredForDisplay"
+            :key="`featured-${pkg.id}`"
+            :pkg="pkg"
+            :use-cases="useCasesByPackage.get(pkg.id) ?? []"
+            :use-cases-filter-to="{ path: '/use-cases', query: { package: pkg.id } }"
+            :show-fit-chip="true"
+            :focused="isPackageFocused(pkg.id)"
+            :pulsing="isPackagePulsing(pkg.id)"
+            @pulse-end="clearPackagePulse"
+          />
+        </div>
+        <CatalogListShell v-else>
+          <PackageListColumnHeader />
+          <div class="catalog-list">
+            <PackageListRow
+              v-for="pkg in featuredForDisplay"
+              :key="`featured-list-${pkg.id}`"
+              :pkg="pkg"
+              :use-cases="useCasesByPackage.get(pkg.id) ?? []"
+              :use-cases-filter-to="{ path: '/use-cases', query: { package: pkg.id } }"
+              :show-fit-chip="true"
+              :focused="isPackageFocused(pkg.id)"
+              :pulsing="isPackagePulsing(pkg.id)"
+              @pulse-end="clearPackagePulse"
+            />
+          </div>
+        </CatalogListShell>
+      </section>
 
       <div class="catalog-header">
-        <h2 class="catalog-header__title">Ecosystem Packages</h2>
-        <span class="catalog-header__count" aria-live="polite">
+        <h2 class="catalog-header-title">Ecosystem Packages</h2>
+        <span
+          v-if="groupBy === 'none'"
+          class="catalog-header-count"
+          aria-live="polite"
+        >
           {{ filtered.length }} package{{ filtered.length !== 1 ? 's' : '' }}
         </span>
       </div>
 
       <div v-if="filtered.length === 0" class="state-empty">
-        <div class="state-empty__icon">🔭</div>
-        <div class="state-empty__title">No packages found</div>
-        <p class="state-empty__subtitle">Try different search terms or reset your filters.</p>
+        <div class="state-empty-icon">🔭</div>
+        <div class="state-empty-title">No packages found</div>
+        <p class="state-empty-subtitle">Try different search terms or reset your filters.</p>
         <button class="btn btn--outline" @click="resetFilters">Reset Filters</button>
       </div>
 
-      <div v-else id="catalog-grid" class="catalog-grid">
-        <PackageCard
-          v-for="pkg in filtered"
-          :key="pkg.id"
-          :pkg="pkg"
-          :use-case-count="useCaseCountByPkg.get(pkg.id) ?? 0"
-          :show-fit-chip="true"
-          :is-probabl-boosted="sortBy === 'ranking' && !!pkg.probabl"
-        />
+      <div
+        v-else
+        class="catalog-ecosystem"
+        :class="{ 'catalog-ecosystem--list': catalogLayout === 'list' }"
+      >
+        <section
+          v-for="(section, sectionIndex) in groupedSections"
+          :key="section.key"
+          class="catalog-group"
+          :class="{ 'catalog-group--first': sectionIndex === 0 }"
+          :aria-labelledby="section.label ? `catalog-group-${section.key}` : undefined"
+        >
+          <h3
+            v-if="section.label && groupBy !== 'none'"
+            :id="`catalog-group-${section.key}`"
+            class="catalog-group-title"
+            :class="section.tier ? `catalog-group-title--tier-${section.tier}` : undefined"
+          >
+            <span v-if="section.subLabel" class="catalog-group-title__label">
+              <span class="catalog-group-title__tier">{{ section.tierLabel }}</span>
+              <span class="catalog-group-title__sub">{{ section.subLabel }}</span>
+            </span>
+            <span v-else class="catalog-group-title__label">{{ section.label }}</span>
+            <span class="catalog-header-count" aria-live="polite">
+              {{ section.packages.length }} package{{
+                section.packages.length !== 1 ? 's' : ''
+              }}
+            </span>
+          </h3>
+
+          <div
+            v-if="catalogLayout === 'cards'"
+            :id="sectionIndex === 0 ? 'catalog-grid' : undefined"
+            class="catalog-grid"
+          >
+            <PackageCard
+              v-for="pkg in section.packages"
+              :key="`${section.key}-${pkg.id}`"
+              :pkg="pkg"
+              :use-cases="useCasesByPackage.get(pkg.id) ?? []"
+              :use-cases-filter-to="{ path: '/use-cases', query: { package: pkg.id } }"
+              :show-fit-chip="true"
+              :focused="isPackageFocused(pkg.id)"
+              :pulsing="isPackagePulsing(pkg.id)"
+              @pulse-end="clearPackagePulse"
+            />
+          </div>
+
+          <CatalogListShell v-else>
+            <PackageListColumnHeader />
+            <div
+              :id="sectionIndex === 0 ? 'catalog-list' : undefined"
+              class="catalog-list"
+            >
+              <PackageListRow
+                v-for="pkg in section.packages"
+                :key="`${section.key}-${pkg.id}`"
+                :pkg="pkg"
+                :use-cases="useCasesByPackage.get(pkg.id) ?? []"
+                :use-cases-filter-to="{ path: '/use-cases', query: { package: pkg.id } }"
+                :show-fit-chip="true"
+                :focused="isPackageFocused(pkg.id)"
+                :pulsing="isPackagePulsing(pkg.id)"
+                @pulse-end="clearPackagePulse"
+              />
+            </div>
+          </CatalogListShell>
+        </section>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.catalog-page {
+  min-width: 0;
+}
+
+.catalog-featured {
+  margin-bottom: var(--space-6);
+  min-width: 0;
+}
+
+.catalog-header--featured {
+  align-items: flex-start;
+}
+
+.catalog-header-main {
+  min-width: 0;
+}
+
+.catalog-featured-tagline {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.catalog-layout-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  width: fit-content;
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.catalog-layout-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 36px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-sm) var(--ease),
+    color var(--duration-sm) var(--ease);
+}
+
+.catalog-layout-toggle__btn:last-child {
+  border-right: none;
+}
+
+.catalog-layout-toggle__btn:hover {
+  color: var(--text-primary);
+  background: var(--neutral-050);
+}
+
+.catalog-layout-toggle__btn.is-active {
+  background: var(--neutral-200);
+  color: var(--color-near-black);
+}
+
+.catalog-layout-toggle__btn:focus-visible {
+  outline: 2px solid var(--color-sky);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.catalog-ecosystem {
+  min-width: 0;
+}
+
+.catalog-group {
+  margin-top: var(--space-8);
+  min-width: 0;
+}
+
+.catalog-group--first {
+  margin-top: 0;
+}
+
+.catalog-group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-6) 0 0;
+  padding-left: var(--space-4);
+  border-left: 4px solid var(--border-subtle);
+  font-family: var(--brand-typography--title);
+  font-size: var(--brand-typography-size--heading-h6);
+  font-weight: 300;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.catalog-group--first .catalog-group-title {
+  padding-top: var(--space-4);
+}
+
+.catalog-group-title--tier-1 {
+  border-left-color: var(--color-sky);
+}
+
+.catalog-group-title--tier-2 {
+  border-left-color: var(--color-orange);
+}
+
+.catalog-group-title--tier-3 {
+  border-left-color: var(--color-midnight-2);
+}
+
+.catalog-group-title__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+}
+
+.catalog-group-title__tier {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-widest);
+  line-height: 1.4;
+}
+
+.catalog-group-title--tier-1 .catalog-group-title__tier {
+  color: var(--color-sky);
+}
+
+.catalog-group-title--tier-2 .catalog-group-title__tier {
+  color: var(--color-orange);
+}
+
+.catalog-group-title--tier-3 .catalog-group-title__tier {
+  color: var(--color-midnight-2);
+}
+
+.catalog-group-title__sub::before {
+  content: '·';
+  margin-right: var(--space-3);
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.catalog-group-title__sub {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  color: var(--text-primary);
+}
+
+.catalog-group-title .catalog-header-count {
+  flex-shrink: 0;
+}
+
+.catalog-ecosystem--list .catalog-group {
+  margin-top: var(--space-8);
+}
+
+.catalog-ecosystem--list .catalog-group--first {
+  margin-top: 0;
+}
+
+.catalog-ecosystem--list .catalog-group-title {
+  padding-top: var(--space-7);
+  margin-bottom: var(--space-4);
+}
+
+.catalog-ecosystem--list .catalog-group--first .catalog-group-title {
+  padding-top: var(--space-4);
+}
+
+.catalog-ecosystem--list .catalog-list-shell {
+  margin-bottom: 0;
+}
+</style>

@@ -5,20 +5,28 @@
   "website": "https://skrub-data.org",
   "repository": "https://github.com/skrub-data/skrub",
   "docs": "https://skrub-data.org/stable/",
-  "nature": "library",
-  "scope": "core",
+  "categories": [
+    "components"
+  ],
   "license": "BSD-3-Clause",
-  "probabl": true,
   "archived": false,
-  "provides_estimators": true,
-  "consumes_estimators": true,
-  "description": "Bridges the gap between dataframes and sklearn by providing TableVectorizer, fuzzy joining (AggJoiner, Joiner), and string encoders (MinHashEncoder, GapEncoder) for messy, real-world tabular data.",
+  "probabl": true,
+  "description": "Skrub bridges the gap between dataframes and scikit-learn by providing a way to track data operations as well as simplify some tabular data preparation tasks.",
   "tags": [
-    "dirty-data",
-    "categorical-encoding",
-    "string-similarity",
-    "tabular",
+    "preprocessing",
     "dataframe",
-    "fuzzy-join"
-  ]
+    "feature-engineering",
+    "multi-tables",
+    "text",
+    "time-series"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": true
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": 97.3
+  }
 }

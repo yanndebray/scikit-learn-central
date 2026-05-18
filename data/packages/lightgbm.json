@@ -3,20 +3,30 @@
   "name": "LightGBM",
   "pypi_name": "lightgbm",
   "website": "https://lightgbm.readthedocs.io",
-  "repository": "https://github.com/microsoft/LightGBM",
+  "repository": "https://github.com/lightgbm-org/LightGBM",
   "docs": "https://lightgbm.readthedocs.io",
-  "nature": "library",
-  "scope": "incremental",
+  "categories": [
+    "components"
+  ],
   "license": "MIT",
   "archived": false,
-  "provides_estimators": true,
-  "consumes_estimators": false,
-  "description": "Microsoft's leaf-wise gradient boosting framework. Faster training than XGBoost on large datasets with native categorical feature support. Provides LGBMClassifier and LGBMRegressor with full sklearn compatibility.",
+  "description": "Gradient boosting on decision trees library with native support for categorical features. Support multiple languages (Python, R, C++), hardware (CPU, GPU), and distributed computing.",
   "tags": [
+    "algorithms",
     "gradient-boosting",
-    "ensemble",
-    "fast-training",
-    "categorical",
-    "GPU"
-  ]
+    "categorical-encoding",
+    "gpu-acceleration",
+    "distributed-computing",
+    "classification",
+    "regression"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": true
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": 90
+  }
 }

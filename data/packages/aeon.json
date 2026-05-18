@@ -5,19 +5,29 @@
   "website": "https://www.aeon-toolkit.org",
   "repository": "https://github.com/aeon-toolkit/aeon",
   "docs": "https://www.aeon-toolkit.org/en/stable/",
-  "nature": "library",
-  "scope": "verticalized",
+  "categories": [
+    "domain-toolkit"
+  ],
   "license": "BSD-3-Clause",
   "archived": false,
-  "provides_estimators": true,
-  "consumes_estimators": true,
-  "description": "Sklearn-compatible toolkit for time series machine learning and data mining. Covers classification, regression, clustering, forecasting, and anomaly detection with a focus on correctness and benchmarking.",
+  "description": "Time series machine learning toolkit. Covers classification, regression, clustering, anomaly detection, segmentation and similarity search.",
   "tags": [
     "time-series",
     "classification",
     "regression",
     "clustering",
     "forecasting",
-    "anomaly-detection"
-  ]
+    "anomaly-detection",
+    "segmentation",
+    "similarity-search"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": true
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": 90.4
+  }
 }

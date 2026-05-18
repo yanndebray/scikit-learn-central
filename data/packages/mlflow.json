@@ -5,18 +5,23 @@
   "website": "https://mlflow.org",
   "repository": "https://github.com/mlflow/mlflow",
   "docs": "https://mlflow.org/docs/latest/",
-  "nature": "application",
-  "scope": "core",
+  "categories": [
+    "mlops"
+  ],
   "license": "Apache-2.0",
   "archived": false,
-  "provides_estimators": false,
-  "consumes_estimators": true,
-  "description": "The standard open-source MLOps platform. Tracks sklearn experiments with autologging (metrics, params, artifacts), registers models with versioning, and deploys to REST endpoints \u2014 all with zero code changes.",
+  "description": "Experiment tracking and model management platform for machine learning.",
   "tags": [
     "experiment-tracking",
-    "MLOps",
-    "model-registry",
-    "autologging",
-    "deployment"
-  ]
+    "mlops"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": true
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": 85.5
+  }
 }

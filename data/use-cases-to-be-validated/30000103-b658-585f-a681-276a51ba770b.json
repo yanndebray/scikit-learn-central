@@ -15,10 +15,8 @@
     "scikit-learn",
     "skrub",
     "category-encoders",
-    "shap",
-    "eli5"
+    "shap"
   ],
   "difficulty": "beginner",
-  "archived": false,
-  "has_notebook": false
+  "archived": false
 }

@@ -5,19 +5,26 @@
   "website": "https://soda-inria.github.io/hazardous",
   "repository": "https://github.com/soda-inria/hazardous",
   "docs": "https://soda-inria.github.io/hazardous",
-  "nature": "library",
-  "scope": "verticalized",
+  "categories": [
+    "domain-toolkit"
+  ],
   "license": "MIT",
-  "probabl": true,
   "archived": false,
-  "provides_estimators": true,
-  "consumes_estimators": false,
-  "description": "Survival analysis and competing risks modeling with gradient boosting. Handles censored data and scenarios where subjects may experience multiple types of events, with sklearn-compatible estimators for time-to-event prediction.",
+  "description": "Survival analysis and competing risks modeling with gradient boosting decision trees.",
   "tags": [
+    "algorithms",
+    "gradient-boosting",
     "survival-analysis",
     "competing-risks",
-    "time-to-event",
-    "gradient-boosting",
-    "censored-data"
-  ]
+    "metrics"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": false
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": null
+  }
 }

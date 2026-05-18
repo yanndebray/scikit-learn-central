@@ -5,18 +5,27 @@
   "website": "https://skforecast.org",
   "repository": "https://github.com/skforecast/skforecast",
   "docs": "https://skforecast.org/latest/",
-  "nature": "library",
-  "scope": "verticalized",
+  "categories": [
+    "domain-toolkit",
+    "assembly-utility"
+  ],
   "license": "BSD-3-Clause",
   "archived": false,
-  "provides_estimators": true,
-  "consumes_estimators": true,
-  "description": "Turn any sklearn-compatible regressor into a powerful forecaster. Provides ForecasterRecursive, ForecasterDirect, and ForecasterMultiSeries with exogenous variable support, backtesting, and hyperparameter tuning.",
+  "description": "Skforecast is a Python library for time series. It adapts any scikit-learn compatible estimator to the forecasting task.",
   "tags": [
     "time-series",
     "forecasting",
-    "autoregressive",
-    "exogenous",
-    "backtesting"
-  ]
+    "preprocessing",
+    "metrics",
+    "model-selection"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": true
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": 96.8
+  }
 }

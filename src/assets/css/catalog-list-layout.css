@@ -1,0 +1,276 @@
+/* Package catalog list: shared column widths, shell, header row (with PackageListRow). */
+.catalog-list-shell {
+  --pkg-col-skore: 11.5rem;
+  --pkg-col-desc: 14rem;
+  --pkg-col-cats: 9rem;
+  --pkg-col-info: 13rem;
+  --pkg-col-fitn: 2.5rem;
+  --pkg-col-uc: 4.75rem;
+  --pkg-col-tags: 14rem;
+  --catalog-grid-line: inset 0 -1px 0 0 var(--border-subtle);
+
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.catalog-list-scroll {
+  width: 100%;
+  min-width: 0;
+  /* Both axes explicit so `overflow-x: auto` alone does not force `overflow-y: auto`. */
+  overflow-x: auto;
+  overflow-y: clip;
+  overscroll-behavior-x: contain;
+  border-radius: inherit;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+
+/* Row-level junctions duplicate shell corners and inflate scroll width. */
+.catalog-list-shell .catalog-list > .card .catalog-list-junction {
+  display: none;
+}
+
+.catalog-list-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+
+.catalog-list-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+.catalog-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Junction squares (same as `.card .outbound-link:nth-child(2):nth-last-child(2)::before/after` in components.css). */
+.catalog-list-junction {
+  position: absolute;
+  width: var(--space-2);
+  height: var(--space-2);
+  box-sizing: border-box;
+  background: var(--bg-surface);
+  border: thin solid var(--border-subtle);
+  pointer-events: none;
+  z-index: 6;
+}
+
+.catalog-list-junction--tl {
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+}
+
+.catalog-list-junction--tr {
+  right: 0;
+  top: 0;
+  transform: translate(50%, -50%);
+}
+
+.catalog-list-junction--bl {
+  left: 0;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+}
+
+.catalog-list-junction--br {
+  right: 0;
+  bottom: 0;
+  transform: translate(50%, 50%);
+}
+
+.catalog-list-shell .catalog-list-header,
+.catalog-list-shell .pkg-row-main {
+  position: relative;
+  z-index: 0;
+  width: max-content;
+  min-width: 100%;
+}
+
+.catalog-list-shell .catalog-list-header {
+  z-index: 1;
+  border-bottom: none;
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
+  box-shadow: var(--catalog-grid-line);
+}
+
+.catalog-list-shell .catalog-list-header:hover {
+  box-shadow: var(--catalog-grid-line);
+}
+
+.catalog-list-shell .catalog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  z-index: 1;
+  width: max-content;
+  min-width: 100%;
+}
+
+.catalog-list-shell .catalog-list > .card {
+  position: relative;
+  align-self: stretch;
+  box-sizing: border-box;
+  border-radius: 0;
+  margin: 0;
+  border: none;
+  border-bottom: none;
+  padding: 0;
+  gap: 0;
+}
+
+.catalog-list-shell .catalog-list > .card:not(:last-child) {
+  box-shadow: var(--catalog-grid-line);
+}
+
+.catalog-list-shell .catalog-list > .card:last-child {
+  box-shadow: none;
+  padding-bottom: 0;
+}
+
+.catalog-list-shell .catalog-list-header.card:hover,
+.catalog-list-shell .catalog-list > .card.pkg-row:hover {
+  border-color: var(--border-subtle);
+}
+
+.catalog-list-shell .catalog-list-header.card:hover,
+.catalog-list-shell .catalog-list > .card.pkg-row:not(:last-child):hover {
+  box-shadow: var(--catalog-grid-line);
+}
+
+.catalog-list-shell .catalog-list-header.card,
+.catalog-list-shell .catalog-list > .card.pkg-row {
+  transition: none;
+}
+
+.catalog-list-shell .pkg-row.pkg-catalog-item.card {
+  overflow-x: visible;
+  max-width: none;
+}
+
+.catalog-list-shell .pkg-row-main,
+.catalog-list-shell .catalog-list-header-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+}
+
+.catalog-list-shell .pkg-row-col,
+.catalog-list-shell .catalog-list-hcell {
+  flex-shrink: 0;
+  flex-grow: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: var(--space-2);
+  border-right: 1px solid var(--border-subtle);
+  min-height: 0;
+}
+
+.catalog-list-shell .catalog-list-hcell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.catalog-list-shell .pkg-row-col:last-child,
+.catalog-list-shell .catalog-list-hcell:last-child {
+  border-right: none;
+}
+
+.catalog-list-shell .catalog-list-hcell--skore {
+  align-items: center;
+  justify-content: center;
+}
+
+.catalog-list-shell .pkg-row-col--skore {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.catalog-list-shell .pkg-row-col--skore,
+.catalog-list-shell .catalog-list-hcell--skore {
+  flex: 0 0 var(--pkg-col-skore);
+  width: var(--pkg-col-skore);
+  max-width: var(--pkg-col-skore);
+}
+
+.catalog-list-shell .pkg-row-col--desc,
+.catalog-list-shell .catalog-list-hcell--desc {
+  flex: 0 0 var(--pkg-col-desc);
+  width: var(--pkg-col-desc);
+  max-width: var(--pkg-col-desc);
+}
+
+.catalog-list-shell .pkg-row-col--cats,
+.catalog-list-shell .catalog-list-hcell--cats {
+  flex: 0 0 var(--pkg-col-cats);
+  width: var(--pkg-col-cats);
+  max-width: var(--pkg-col-cats);
+}
+
+.catalog-list-shell .pkg-row-col--info,
+.catalog-list-shell .catalog-list-hcell--info {
+  flex: 0 0 var(--pkg-col-info);
+  width: var(--pkg-col-info);
+  max-width: var(--pkg-col-info);
+}
+
+.catalog-list-shell .catalog-list-hcell--info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.catalog-list-shell .pkg-row-col--info {
+  display: flex;
+  align-items: center;
+}
+
+.catalog-list-shell .pkg-row-col--fitn,
+.catalog-list-shell .catalog-list-hcell--fitn {
+  flex: 0 0 var(--pkg-col-fitn);
+  width: var(--pkg-col-fitn);
+  max-width: var(--pkg-col-fitn);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.catalog-list-shell .pkg-row-col--uc,
+.catalog-list-shell .catalog-list-hcell--uc {
+  flex: 0 0 var(--pkg-col-uc);
+  width: var(--pkg-col-uc);
+  max-width: var(--pkg-col-uc);
+}
+
+.catalog-list-shell .pkg-row-col--tags,
+.catalog-list-shell .catalog-list-hcell--tags {
+  flex: 0 0 var(--pkg-col-tags);
+  width: var(--pkg-col-tags);
+  max-width: var(--pkg-col-tags);
+  border-right: none;
+}
+
+.catalog-list-shell .pkg-row-col--tags {
+  overflow: visible;
+}
+
+.catalog-list-shell .catalog-list-header.card {
+  padding: 0;
+  border: none;
+  border-bottom: none;
+}

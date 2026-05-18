@@ -5,18 +5,31 @@
   "website": "https://riverml.xyz",
   "repository": "https://github.com/online-ml/river",
   "docs": "https://riverml.xyz/latest/",
-  "nature": "library",
-  "scope": "incremental",
+  "categories": [
+    "domain-toolkit"
+  ],
   "license": "BSD-3-Clause",
   "archived": false,
-  "provides_estimators": true,
-  "consumes_estimators": false,
-  "description": "Sklearn for streaming data. River is the leading online machine learning library for Python, offering incremental learning, concept drift detection, and adaptive models for real-time data streams.",
+  "description": "River is a machine learning library for online learning, when data is accessible as a stream.",
   "tags": [
+    "algorithms",
     "online-learning",
-    "streaming",
-    "incremental",
-    "concept-drift",
-    "real-time"
-  ]
+    "classification",
+    "regression",
+    "clustering",
+    "imbalanced-data",
+    "dimensionality-reduction",
+    "preprocessing",
+    "metrics",
+    "anomaly-detection"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": true
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": 90.1
+  }
 }

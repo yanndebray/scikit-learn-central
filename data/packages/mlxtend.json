@@ -5,18 +5,27 @@
   "website": "https://rasbt.github.io/mlxtend/",
   "repository": "https://github.com/rasbt/mlxtend",
   "docs": "https://rasbt.github.io/mlxtend/",
-  "nature": "library",
-  "scope": "core",
+  "categories": [
+    "assembly-utility"
+  ],
   "license": "BSD-3-Clause",
   "archived": false,
-  "provides_estimators": true,
-  "consumes_estimators": true,
-  "description": "Machine learning extensions for sklearn: StackingClassifier, SequentialFeatureSelector, EnsembleVoteClassifier, association rule mining (Apriori), and more practical tools for everyday ML workflows.",
+  "description": "Library providing a set of estimators extending the scikit-learn library.",
   "tags": [
-    "stacking",
-    "feature-selection",
-    "ensemble",
-    "association-rules",
-    "utilities"
-  ]
+    "algorithms",
+    "classification",
+    "regression",
+    "clustering",
+    "preprocessing",
+    "text"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": true
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": 78.3
+  }
 }

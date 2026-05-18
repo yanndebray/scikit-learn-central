@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import useCasesIndex from '@data/use-cases.json'
 import type { UseCase, UseCasesIndex } from '@/types/usecase'
 
@@ -30,11 +30,25 @@ function loadAll(): UseCase[] {
   return uuids
     .map((id) => byUuid.get(id))
     .filter((uc): uc is UseCase => !!uc && !uc.archived)
-    .sort((a, b) => a.title.localeCompare(b.title))
 }
 
 const cache: Ref<UseCase[]> = ref(loadAll())
 
+/** packageId → ordered list of use cases that reference it.
+ *  Lets the package card render concrete task-level proofs (titles), not
+ *  just a count — matching Nadi & Sakr's "fit-for-purpose at the task level". */
+const useCasesByPackage: ComputedRef<Map<string, UseCase[]>> = computed(() => {
+  const m = new Map<string, UseCase[]>()
+  for (const uc of cache.value) {
+    for (const id of uc.packages) {
+      const list = m.get(id)
+      if (list) list.push(uc)
+      else m.set(id, [uc])
+    }
+  }
+  return m
+})
+
 export function useUseCases() {
-  return { useCases: cache }
+  return { useCases: cache, useCasesByPackage }
 }

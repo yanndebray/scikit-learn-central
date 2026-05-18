@@ -5,18 +5,26 @@
   "website": "https://scikit-survival.readthedocs.io",
   "repository": "https://github.com/sebp/scikit-survival",
   "docs": "https://scikit-survival.readthedocs.io",
-  "nature": "library",
-  "scope": "verticalized",
+  "categories": [
+    "domain-toolkit"
+  ],
   "license": "GPL-3.0",
   "archived": false,
-  "provides_estimators": true,
-  "consumes_estimators": false,
-  "description": "Survival analysis built on top of sklearn. Implements Cox PH, Random Survival Forest, Survival SVM, and GradientBoostingSurvivalAnalysis. Handles censored data with full sklearn Pipeline compatibility.",
+  "description": "A Python library for survival analysis.",
   "tags": [
+    "algorithms",
+    "gradient-boosting",
     "survival-analysis",
-    "time-to-event",
-    "censored-data",
-    "Cox-regression",
-    "healthcare"
-  ]
+    "metrics",
+    "preprocessing"
+  ],
+  "docs_quality": {
+    "getting_started": true,
+    "api_reference": true,
+    "narrative_guide": true
+  },
+  "testing": {
+    "has_tests": true,
+    "test_coverage": 98.5
+  }
 }
