@@ -3,10 +3,8 @@
 `data/use-cases/datasets/`.
 
 C-MAPSS is the turbofan run-to-failure simulator from NASA's Prognostics Center
-of Excellence (the same dataset MathWorks uses in their "Similarity-Based
-Remaining Useful Life Estimation" tutorial). Embedding it lets the JupyterLite
-build ship it alongside the predictive-maintenance notebook so it runs entirely
-offline.
+of Excellence. Embedding it lets the JupyterLite build ship it alongside the
+predictive-maintenance notebook so it runs entirely offline.
 
 The script is patterned after `fetch_datasets.py`. Re-run after a refresh:
 

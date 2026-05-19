@@ -16,9 +16,7 @@
 #
 # The bundled CSVs come from **NASA's C-MAPSS turbofan engine degradation
 # simulator** (subset **FD001**: sea-level operating condition, single fault
-# mode — HPC degradation). It is the same dataset MathWorks ships in their
-# *Predictive Maintenance Toolbox* tutorial on similarity-based Remaining Useful
-# Life estimation.
+# mode — HPC degradation).
 #
 # Each row is one operational **cycle** of one **engine** (`unit`). The training
 # set follows every engine from a healthy start to the cycle on which it fails;
