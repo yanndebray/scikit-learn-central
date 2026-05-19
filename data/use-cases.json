@@ -2,11 +2,12 @@
   "meta": {
     "version": "6.0",
     "count": 1,
-    "updated": "2026-03-03"
+    "updated": "2026-05-18"
   },
   "use_cases": [
     "use_case_fraud_detection_banking",
     "use_case_sentiment_analysis",
-    "use_case_real_estate"
+    "use_case_real_estate",
+    "use_case_predictive_maintenance"
   ]
 }

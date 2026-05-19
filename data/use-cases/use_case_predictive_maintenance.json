@@ -1,0 +1,23 @@
+{
+  "uuid": "use_case_predictive_maintenance",
+  "slug": "predictive-maintenance",
+  "title": "Aircraft Engine Predictive Maintenance",
+  "synopsis": "Estimate the Remaining Useful Life of turbofan engines from NASA's C-MAPSS run-to-failure simulator. Compare a Ridge, a histogram gradient-boosted tree, and a random forest with skrub pipelines, using skore.evaluate for grouped cross-validation across engines, checks, and aggregated metrics.",
+  "application_fields": [
+    "manufacturing"
+  ],
+  "problem_types": [
+    "regression",
+    "predictive-maintenance"
+  ],
+  "data_types": [
+    "tabular"
+  ],
+  "packages": [
+    "scikit-learn",
+    "skrub",
+    "skore"
+  ],
+  "difficulty": "intermediate",
+  "archived": false
+}

@@ -110,6 +110,10 @@ description = "One-off: replace legacy `nature`+`scope` with the categories taxo
 cmd = "python scripts/fetch_datasets.py"
 description = "Download california housing + german credit and commit as CSV under data/use-cases/datasets/."
 
+[feature.datasets.tasks.fetch-cmapss]
+cmd = "python scripts/fetch_cmapss.py"
+description = "Download NASA C-MAPSS FD001 and commit as CSV under data/use-cases/datasets/."
+
 # Builds dist/jupyterlite/ from data/use-cases/*.py. Lives in the jupyterlite
 # env so the heavy Jupyter stack isn't pulled into the default env (which only
 # needs Node for the Vue build).
