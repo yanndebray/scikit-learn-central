@@ -24,7 +24,7 @@ public/jupyterlite
 # Python
 __pycache__/
 *.pyc
-.venv/
+.venv*/
 venv/
 
 # Editor

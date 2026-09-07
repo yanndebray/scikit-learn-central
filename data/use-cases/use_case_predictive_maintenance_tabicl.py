@@ -16,11 +16,17 @@
 # TabICL runs on **PyTorch** and downloads its checkpoint from the Hugging Face
 # Hub on first use, so — unlike the other use cases in this catalog — **this
 # notebook does not run in JupyterLite** (the in-browser Pyodide kernel has no
-# torch). Run it in a local Python environment:
+# torch). Run it in a local Python environment, on **Python 3.10 or newer**:
 #
 # ```bash
 # pip install skore skrub tabicl matplotlib
 # ```
+#
+# The version floor is worth stating because the failure is silent: `tabicl`
+# has no wheel for 3.9, and pip on 3.9 happily resolves `skore` back to 0.9.1,
+# which predates `skore.evaluate` — so the comparison cell below dies with
+# `AttributeError: module 'skore' has no attribute 'evaluate'` rather than
+# anything about your Python version.
 #
 # The cells below degrade gracefully: if `tabicl` is missing, the gradient
 # boosting baseline still runs and the TabICL comparisons are skipped.
