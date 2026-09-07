@@ -6,7 +6,9 @@ Pipeline:
   1. Convert each ``data/use-cases/*.py`` to ``.ipynb`` via jupytext.
   2. Mirror ``data/use-cases/datasets/`` next to the notebooks so relative
      reads like ``pd.read_csv("datasets/foo.csv")`` resolve in Pyodide.
-  3. Run ``jupyter lite build`` with those notebooks as content into the
+  3. Pin the Pyodide runtime the in-browser kernel loads (see
+     ``PYODIDE_VERSION``) via a generated ``jupyter-lite.json``.
+  4. Run ``jupyter lite build`` with those notebooks as content into the
      requested output directory.
 
 Notebooks are emitted as-is from the ``.py`` source. Any per-notebook setup
@@ -21,15 +23,58 @@ Usage
 -----
   pixi run -e jupyterlite build-jupyterlite                 # → dist/jupyterlite/
   pixi run -e jupyterlite build-jupyterlite --output-dir X  # → X/
+  pixi run -e jupyterlite build-jupyterlite --pyodide-version 0.28.3
 """
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+# Pyodide runtime the in-browser kernel loads. jupyterlite-pyodide-kernel 0.4.x
+# defaults to Pyodide 0.27.0, which pre-installs packaging==23.2 — and micropip
+# refuses to *upgrade* an already-installed package, so every notebook whose
+# `%pip install` pulls something needing `packaging>=24.2` (skore does) dies with
+#   ValueError: Requested 'packaging>=24.2', but packaging==23.2 is already installed
+# Pyodide 0.27.7 ships packaging==24.2 and is the last 0.27.x, i.e. the same
+# Python 3.12 / wasm ABI the pinned kernel was built against.
+PYODIDE_VERSION = "0.27.7"
+
+# Settings key the pyodide kernel extension reads its runtime URL from.
+PYODIDE_KERNEL_PLUGIN_ID = "@jupyterlite/pyodide-kernel-extension:kernel"
+
+
+def _write_lite_config(lite_dir: Path, pyodide_version: str) -> Path:
+    """Write a ``jupyter-lite.json`` that overrides the kernel's Pyodide URL.
+
+    ``jupyter lite build`` merges any ``jupyter-lite.json`` found under
+    ``--lite-dir`` into the generated one, so this only overrides `pyodideUrl`
+    and leaves everything else (federated extensions, piplite wheel index, …)
+    to the build.
+    """
+    lite_dir.mkdir(parents=True, exist_ok=True)
+    config = lite_dir / "jupyter-lite.json"
+    url = f"https://cdn.jsdelivr.net/pyodide/v{pyodide_version}/full/pyodide.js"
+    config.write_text(
+        json.dumps(
+            {
+                "jupyter-config-data": {
+                    "litePluginSettings": {
+                        PYODIDE_KERNEL_PLUGIN_ID: {"pyodideUrl": url}
+                    }
+                }
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    print(f"  • pyodide {pyodide_version} → {url}")
+    return config
 
 
 def _convert_use_cases(src_dir: Path, dest_dir: Path) -> list[Path]:
@@ -79,6 +124,14 @@ def main() -> int:
         default=Path("dist/jupyterlite"),
         help="Where to write the built JupyterLite site (default: dist/jupyterlite)",
     )
+    parser.add_argument(
+        "--pyodide-version",
+        default=PYODIDE_VERSION,
+        help=(
+            "Pyodide runtime the in-browser kernel loads "
+            f"(default: {PYODIDE_VERSION}; must ship packaging>=24.2 for skore)"
+        ),
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -100,6 +153,12 @@ def main() -> int:
         if n_datasets:
             print(f"  ✓ embedded {n_datasets} dataset file(s)")
 
+        # Sibling of `files/`, not its parent: anything under --lite-dir named
+        # jupyter-lite.json is merged, and `files/` there would be picked up a
+        # second time as content.
+        lite_dir = Path(tmp) / "lite"
+        _write_lite_config(lite_dir, args.pyodide_version)
+
         if out_dir.exists():
             shutil.rmtree(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -109,6 +168,7 @@ def main() -> int:
             [
                 "jupyter", "lite", "build",
                 "--contents", str(contents_root),
+                "--lite-dir", str(lite_dir),
                 "--output-dir", str(out_dir),
             ],
             check=True,
