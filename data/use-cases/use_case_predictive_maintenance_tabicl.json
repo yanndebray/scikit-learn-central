@@ -1,0 +1,24 @@
+{
+  "uuid": "use_case_predictive_maintenance_tabicl",
+  "slug": "predictive-maintenance-tabicl",
+  "title": "Turbofan RUL: Gradient Boosting vs. Tabular Foundation Model",
+  "synopsis": "An alternative take on the C-MAPSS Remaining Useful Life problem: put HistGradientBoostingRegressor head to head with TabICL, a pre-trained tabular foundation model that predicts by in-context learning. One skore.evaluate comparison with grouped cross-validation over engines shows the foundation model winning on accuracy and steadiness while costing a hundredfold more per prediction, and a data-efficiency curve over the number of run-to-failure engines shows how few broken machines each model needs.",
+  "application_fields": [
+    "manufacturing"
+  ],
+  "problem_types": [
+    "regression",
+    "predictive-maintenance"
+  ],
+  "data_types": [
+    "tabular"
+  ],
+  "packages": [
+    "scikit-learn",
+    "skrub",
+    "skore",
+    "tabicl"
+  ],
+  "difficulty": "advanced",
+  "archived": false
+}

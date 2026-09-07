@@ -8,6 +8,7 @@
     "use_case_fraud_detection_banking",
     "use_case_sentiment_analysis",
     "use_case_real_estate",
-    "use_case_predictive_maintenance"
+    "use_case_predictive_maintenance",
+    "use_case_predictive_maintenance_tabicl"
   ]
 }
